@@ -75,6 +75,7 @@ func main() {
 	cmds.register("reset", handleReset)
 	cmds.register("users", handleUsers)
 	cmds.register("agg", handleAgg)
+	cmds.register("addfeed", handleAddFeed)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -191,6 +192,45 @@ func handleAgg(s *state, cmd command) error {
 		fmt.Printf("Item Description: %s\n", item.Description)
 		fmt.Printf("Item Publish Date: %s\n", item.PubDate)
 	}
+
+	return nil
+}
+
+func handleAddFeed(s *state, cmd command) error {
+	if cmd.name != "addfeed" {
+		return fmt.Errorf("invalid command")
+	}
+	if len(cmd.args) < 2 {
+		return fmt.Errorf("feed name and url is required")
+	}
+
+	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
+	if err != nil {
+		return err
+	}
+
+	feedName := cmd.args[0]
+	feedUrl := cmd.args[1]
+
+	feed, err := s.db.CreateFeed(
+		context.Background(),
+		database.CreateFeedParams{
+			ID:        uuid.New(),
+			Name:      feedName,
+			Url:       feedUrl,
+			UserID:    user.ID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf(
+		"Added feed %s\nID: %s\nURL: %s\nCreated At: %s\nUpdated At: %s",
+		feed.Name, feed.ID, feed.Url, feed.CreatedAt.Local().String(), feed.UpdatedAt.Local().String(),
+	)
 
 	return nil
 }
