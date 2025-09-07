@@ -30,7 +30,6 @@ type commands struct {
 }
 
 func main() {
-
 	cfg, err := config.Read()
 	if err != nil {
 		log.Fatal(err)
@@ -54,6 +53,7 @@ func main() {
 	cmds.register("login", handlerLogin)
 	cmds.register("register", handleRegister)
 	cmds.register("reset", handleReset)
+	cmds.register("users", handleUsers)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -129,6 +129,24 @@ func handleReset(s *state, cmd command) error {
 		return err
 	}
 	fmt.Println("Successfully deleted all users")
+	return nil
+}
+
+func handleUsers(s *state, cmd command) error {
+	if cmd.name != "users" {
+		return fmt.Errorf("invalid command")
+	}
+	users, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		username := user.Name
+		if s.cfg.CurrentUserName == username {
+			username += " (current)"
+		}
+		fmt.Printf("* %s\n", username)
+	}
 	return nil
 }
 
