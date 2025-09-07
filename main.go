@@ -53,6 +53,7 @@ func main() {
 
 	cmds.register("login", handlerLogin)
 	cmds.register("register", handleRegister)
+	cmds.register("reset", handleReset)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -66,6 +67,26 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func handlerLogin(s *state, cmd command) error {
+	if cmd.name != "login" {
+		return fmt.Errorf("invalid command")
+	}
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("username is required")
+	}
+	username := cmd.args[0]
+	user, err := s.db.GetUser(context.Background(), username)
+	if err != nil {
+		return err
+	}
+	err = s.cfg.SetUser(user.Name)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Logged in as %s\n", username)
+	return nil
 }
 
 func handleRegister(s *state, cmd command) error {
@@ -99,23 +120,15 @@ func handleRegister(s *state, cmd command) error {
 	return nil
 }
 
-func handlerLogin(s *state, cmd command) error {
-	if cmd.name != "login" {
+func handleReset(s *state, cmd command) error {
+	if cmd.name != "reset" {
 		return fmt.Errorf("invalid command")
 	}
-	if len(cmd.args) < 1 {
-		return fmt.Errorf("username is required")
-	}
-	username := cmd.args[0]
-	user, err := s.db.GetUser(context.Background(), username)
+	err := s.db.DeleteUsers(context.Background())
 	if err != nil {
 		return err
 	}
-	err = s.cfg.SetUser(user.Name)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Logged in as %s\n", username)
+	fmt.Println("Successfully deleted all users")
 	return nil
 }
 
