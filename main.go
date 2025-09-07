@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/xml"
 	"fmt"
+	"html"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -27,6 +31,22 @@ type command struct {
 
 type commands struct {
 	cmds map[string]func(*state, command) error
+}
+
+type RSSFeed struct {
+	Channel struct {
+		Title       string    `xml:"title"`
+		Link        string    `xml:"link"`
+		Description string    `xml:"description"`
+		Item        []RSSItem `xml:"item"`
+	} `xml:"channel"`
+}
+
+type RSSItem struct {
+	Title       string `xml:"title"`
+	Link        string `xml:"link"`
+	Description string `xml:"description"`
+	PubDate     string `xml:"pubDate"`
 }
 
 func main() {
@@ -54,6 +74,7 @@ func main() {
 	cmds.register("register", handleRegister)
 	cmds.register("reset", handleReset)
 	cmds.register("users", handleUsers)
+	cmds.register("agg", handleAgg)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -150,10 +171,69 @@ func handleUsers(s *state, cmd command) error {
 	return nil
 }
 
+func handleAgg(s *state, cmd command) error {
+	if cmd.name != "agg" {
+		return fmt.Errorf("invalid command")
+	}
+	rssFeed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Title: %s\n", rssFeed.Channel.Title)
+	fmt.Printf("Link: %s\n", rssFeed.Channel.Link)
+	fmt.Printf("Description: %s\n", rssFeed.Channel.Description)
+
+	fmt.Println("Items")
+	for _, item := range rssFeed.Channel.Item {
+		fmt.Printf("Item Title: %s\n", item.Title)
+		fmt.Printf("Item Link: %s\n", item.Link)
+		fmt.Printf("Item Description: %s\n", item.Description)
+		fmt.Printf("Item Publish Date: %s\n", item.PubDate)
+	}
+
+	return nil
+}
+
 func (c *commands) run(s *state, cmd command) error {
 	return c.cmds[cmd.name](s, cmd)
 }
 
 func (c *commands) register(name string, f func(*state, command) error) {
 	c.cmds[name] = f
+}
+
+func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "gator")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var rssFeed RSSFeed
+	err = xml.Unmarshal(bodyBytes, &rssFeed)
+	if err != nil {
+		return nil, err
+	}
+
+	rssFeed.Channel.Title = html.UnescapeString(rssFeed.Channel.Title)
+	rssFeed.Channel.Description = html.UnescapeString(rssFeed.Channel.Description)
+	for idx, item := range rssFeed.Channel.Item {
+		rssFeed.Channel.Item[idx].Title = html.UnescapeString(item.Title)
+		rssFeed.Channel.Item[idx].Description = html.UnescapeString(item.Description)
+	}
+
+	return &rssFeed, nil
 }
