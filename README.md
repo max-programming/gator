@@ -239,6 +239,47 @@ This project uses [sqlc](https://sqlc.dev/) to generate type-safe Go code from S
 sqlc generate
 ```
 
+## 🚀 Future Features
+
+We're always looking to improve Gator! Here are some exciting features we'd love to add. **Contributions are welcome!**
+
+If you're interested in implementing any of these features, please open an issue to discuss the approach before starting work:
+
+- [ ] **Enhanced Browse Command**
+
+  - [ ] Add sorting options (by date, title, feed)
+  - [ ] Add filtering capabilities (by feed, date range, keywords)
+  - [ ] Add pagination for better navigation through large post collections
+
+- [ ] **Performance & Scalability**
+
+  - [ ] Add concurrency to the `agg` command for faster feed fetching
+  - [ ] Implement parallel feed processing for better performance
+
+- [ ] **Search & Discovery**
+
+  - [ ] Add a `search` command with fuzzy searching capabilities
+  - [ ] Full-text search across post titles and descriptions
+
+- [ ] **User Experience**
+
+  - [ ] Add bookmarking/liking functionality for posts
+  - [ ] Build a Terminal User Interface (TUI) for better post viewing
+  - [ ] Option to open posts in browser directly from TUI
+
+- [ ] **API & Remote Access**
+
+  - [ ] Create HTTP REST API for remote access
+  - [ ] Add authentication and authorization system
+  - [ ] Enable multi-user remote access
+
+- [ ] **Service Management**
+  - [ ] Build a service manager for background `agg` command
+  - [ ] Auto-restart functionality if aggregator crashes
+  - [ ] Systemd integration for Linux systems
+
+**Have an idea for a new feature?** We'd love to hear about it! Please open an issue to discuss your ideas.
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -253,6 +294,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
+- Built following the excellent [Build a Blog Aggregator in Go](https://www.boot.dev/courses/build-blog-aggregator-golang) course from [boot.dev](https://www.boot.dev/)
 - Built with [Go](https://golang.org/)
 - Database powered by [PostgreSQL](https://www.postgresql.org/)
 - SQL code generation by [sqlc](https://sqlc.dev/)
