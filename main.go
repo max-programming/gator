@@ -12,10 +12,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/max-programming/gator/internal/config"
 	"github.com/max-programming/gator/internal/database"
 
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
@@ -77,6 +77,8 @@ func main() {
 	cmds.register("agg", handleAgg)
 	cmds.register("addfeed", handleAddFeed)
 	cmds.register("feeds", handleFeeds)
+	cmds.register("follow", handleFollow)
+	cmds.register("following", handleFollowing)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -229,9 +231,25 @@ func handleAddFeed(s *state, cmd command) error {
 	}
 
 	fmt.Printf(
-		"Added feed %s\nID: %s\nURL: %s\nCreated At: %s\nUpdated At: %s",
+		"Added feed %s\nID: %s\nURL: %s\nCreated At: %s\nUpdated At: %s\n",
 		feed.Name, feed.ID, feed.Url, feed.CreatedAt.Local().String(), feed.UpdatedAt.Local().String(),
 	)
+
+	_, err = s.db.CreateFeedFollow(
+		context.Background(),
+		database.CreateFeedFollowParams{
+			ID:        uuid.New(),
+			UserID:    user.ID,
+			FeedID:    feed.ID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Feed Followed!")
 
 	return nil
 }
@@ -256,8 +274,82 @@ func handleFeeds(s *state, cmd command) error {
 	return nil
 }
 
+func handleFollow(s *state, cmd command) error {
+	if cmd.name != "follow" {
+		return fmt.Errorf("invalid command")
+	}
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("url is required")
+	}
+
+	feedUrl := cmd.args[0]
+
+	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
+	if err != nil {
+		return err
+	}
+
+	feed, err := s.db.GetFeedByURL(context.Background(), feedUrl)
+	if err != nil {
+		return err
+	}
+
+	feed_follow, err := s.db.CreateFeedFollow(
+		context.Background(),
+		database.CreateFeedFollowParams{
+			ID:        uuid.New(),
+			UserID:    user.ID,
+			FeedID:    feed.ID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf(
+		"Feed Name: %s\nUser Name: %s\n",
+		feed_follow.FeedName, feed_follow.UserName,
+	)
+
+	return nil
+}
+
+func handleFollowing(s *state, cmd command) error {
+	if cmd.name != "following" {
+		return fmt.Errorf("invalid command")
+	}
+
+	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
+	if err != nil {
+		return err
+	}
+
+	feed_follows, err := s.db.GetFeedFollowsForUser(
+		context.Background(),
+		user.ID,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, feed_follow := range feed_follows {
+		fmt.Printf(
+			"Feed Name: %s\n",
+			feed_follow.FeedName,
+		)
+	}
+
+	return nil
+}
+
 func (c *commands) run(s *state, cmd command) error {
-	return c.cmds[cmd.name](s, cmd)
+	f, exists := c.cmds[cmd.name]
+	if !exists {
+		return fmt.Errorf("invalid command")
+	}
+	return f(s, cmd)
 }
 
 func (c *commands) register(name string, f func(*state, command) error) {
