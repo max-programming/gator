@@ -19,10 +19,12 @@ FROM feeds f
 UPDATE feeds
 SET last_fetched_at = $1,
   updated_at = $2
-WHERE id = $3;
+WHERE id = $3
+  AND user_id = $4;
 
 -- name: GetNextFeedToFetch :one
 SELECT *
 FROM feeds
+WHERE user_id = $1
 ORDER BY last_fetched_at ASC NULLS FIRST
 LIMIT 1;
