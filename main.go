@@ -79,6 +79,7 @@ func main() {
 	cmds.register("feeds", handleFeeds)
 	cmds.register("follow", middlewareLoggedIn(handleFollow))
 	cmds.register("following", middlewareLoggedIn(handleFollowing))
+	cmds.register("unfollow", middlewareLoggedIn(handleUnfollow))
 
 	args := os.Args
 	if len(args) < 2 {
@@ -325,6 +326,38 @@ func handleFollowing(s *state, cmd command, user database.User) error {
 			feed_follow.FeedName,
 		)
 	}
+
+	return nil
+}
+
+func handleUnfollow(s *state, cmd command, user database.User) error {
+	if cmd.name != "unfollow" {
+		return fmt.Errorf("invalid command")
+	}
+
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("url is required")
+	}
+
+	feedUrl := cmd.args[0]
+
+	feed, err := s.db.GetFeedByURL(context.Background(), feedUrl)
+	if err != nil {
+		return err
+	}
+
+	err = s.db.DeleteFeedFollowByUserIDAndFeedID(
+		context.Background(),
+		database.DeleteFeedFollowByUserIDAndFeedIDParams{
+			UserID: user.ID,
+			FeedID: feed.ID,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Successfully unfollowed the feed")
 
 	return nil
 }
