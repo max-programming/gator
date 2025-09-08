@@ -74,7 +74,7 @@ func main() {
 	cmds.register("register", handleRegister)
 	cmds.register("reset", handleReset)
 	cmds.register("users", handleUsers)
-	cmds.register("agg", handleAgg)
+	cmds.register("agg", middlewareLoggedIn(handleAgg))
 	cmds.register("addfeed", middlewareLoggedIn(handleAddFeed))
 	cmds.register("feeds", handleFeeds)
 	cmds.register("follow", middlewareLoggedIn(handleFollow))
@@ -176,28 +176,25 @@ func handleUsers(s *state, cmd command) error {
 	return nil
 }
 
-func handleAgg(s *state, cmd command) error {
+func handleAgg(s *state, cmd command, user database.User) error {
 	if cmd.name != "agg" {
 		return fmt.Errorf("invalid command")
 	}
-	rssFeed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("time between requests is required")
+	}
+
+	timeBetweenReqs, err := time.ParseDuration(cmd.args[0])
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Title: %s\n", rssFeed.Channel.Title)
-	fmt.Printf("Link: %s\n", rssFeed.Channel.Link)
-	fmt.Printf("Description: %s\n", rssFeed.Channel.Description)
+	fmt.Printf("Collecting feeds every %s\n", timeBetweenReqs.String())
 
-	fmt.Println("Items")
-	for _, item := range rssFeed.Channel.Item {
-		fmt.Printf("Item Title: %s\n", item.Title)
-		fmt.Printf("Item Link: %s\n", item.Link)
-		fmt.Printf("Item Description: %s\n", item.Description)
-		fmt.Printf("Item Publish Date: %s\n", item.PubDate)
+	ticker := time.NewTicker(timeBetweenReqs)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s, user)
 	}
-
-	return nil
 }
 
 func handleAddFeed(s *state, cmd command, user database.User) error {
@@ -420,4 +417,43 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	}
 
 	return &rssFeed, nil
+}
+
+func scrapeFeeds(s *state, user database.User) error {
+	feed, err := s.db.GetNextFeedToFetch(context.Background(), user.ID)
+	if err != nil {
+		return err
+	}
+
+	err = s.db.MarkFeedFetched(
+		context.Background(),
+		database.MarkFeedFetchedParams{
+			ID:            feed.ID,
+			UserID:        user.ID,
+			LastFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			UpdatedAt:     time.Now(),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	rssFeed, err := fetchFeed(context.Background(), feed.Url)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Title: %s\n", rssFeed.Channel.Title)
+	fmt.Printf("Link: %s\n", rssFeed.Channel.Link)
+	fmt.Printf("Description: %s\n", rssFeed.Channel.Description)
+
+	fmt.Println("Items")
+	for _, item := range rssFeed.Channel.Item {
+		fmt.Printf("Item Title: %s\n", item.Title)
+		fmt.Printf("Item Link: %s\n", item.Link)
+		fmt.Printf("Item Description: %s\n", item.Description)
+		fmt.Printf("Item Publish Date: %s\n", item.PubDate)
+	}
+
+	return nil
 }
