@@ -75,10 +75,10 @@ func main() {
 	cmds.register("reset", handleReset)
 	cmds.register("users", handleUsers)
 	cmds.register("agg", handleAgg)
-	cmds.register("addfeed", handleAddFeed)
+	cmds.register("addfeed", middlewareLoggedIn(handleAddFeed))
 	cmds.register("feeds", handleFeeds)
-	cmds.register("follow", handleFollow)
-	cmds.register("following", handleFollowing)
+	cmds.register("follow", middlewareLoggedIn(handleFollow))
+	cmds.register("following", middlewareLoggedIn(handleFollowing))
 
 	args := os.Args
 	if len(args) < 2 {
@@ -199,17 +199,12 @@ func handleAgg(s *state, cmd command) error {
 	return nil
 }
 
-func handleAddFeed(s *state, cmd command) error {
+func handleAddFeed(s *state, cmd command, user database.User) error {
 	if cmd.name != "addfeed" {
 		return fmt.Errorf("invalid command")
 	}
 	if len(cmd.args) < 2 {
 		return fmt.Errorf("feed name and url is required")
-	}
-
-	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
-	if err != nil {
-		return err
 	}
 
 	feedName := cmd.args[0]
@@ -274,7 +269,7 @@ func handleFeeds(s *state, cmd command) error {
 	return nil
 }
 
-func handleFollow(s *state, cmd command) error {
+func handleFollow(s *state, cmd command, user database.User) error {
 	if cmd.name != "follow" {
 		return fmt.Errorf("invalid command")
 	}
@@ -283,11 +278,6 @@ func handleFollow(s *state, cmd command) error {
 	}
 
 	feedUrl := cmd.args[0]
-
-	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
-	if err != nil {
-		return err
-	}
 
 	feed, err := s.db.GetFeedByURL(context.Background(), feedUrl)
 	if err != nil {
@@ -316,14 +306,9 @@ func handleFollow(s *state, cmd command) error {
 	return nil
 }
 
-func handleFollowing(s *state, cmd command) error {
+func handleFollowing(s *state, cmd command, user database.User) error {
 	if cmd.name != "following" {
 		return fmt.Errorf("invalid command")
-	}
-
-	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
-	if err != nil {
-		return err
 	}
 
 	feed_follows, err := s.db.GetFeedFollowsForUser(
@@ -342,6 +327,19 @@ func handleFollowing(s *state, cmd command) error {
 	}
 
 	return nil
+}
+
+func middlewareLoggedIn(
+	handler func(s *state, cmd command, user database.User) error,
+) func(*state, command) error {
+	return func(s *state, c command) error {
+		user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
+		if err != nil {
+			return err
+		}
+
+		return handler(s, c, user)
+	}
 }
 
 func (c *commands) run(s *state, cmd command) error {
