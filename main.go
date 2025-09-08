@@ -10,13 +10,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/max-programming/gator/internal/config"
 	"github.com/max-programming/gator/internal/database"
 
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	pq "github.com/lib/pq"
+	"github.com/timematic/anytime"
+)
+
+const (
+	UniqueViolationError = pq.ErrorCode("23505")
 )
 
 type state struct {
@@ -80,6 +86,7 @@ func main() {
 	cmds.register("follow", middlewareLoggedIn(handleFollow))
 	cmds.register("following", middlewareLoggedIn(handleFollowing))
 	cmds.register("unfollow", middlewareLoggedIn(handleUnfollow))
+	cmds.register("browse", middlewareLoggedIn(handleBrowse))
 
 	args := os.Args
 	if len(args) < 2 {
@@ -359,6 +366,45 @@ func handleUnfollow(s *state, cmd command, user database.User) error {
 	return nil
 }
 
+func handleBrowse(s *state, cmd command, user database.User) error {
+	if cmd.name != "browse" {
+		return fmt.Errorf("invalid command")
+	}
+
+	limit := int32(2)
+
+	if len(cmd.args) == 1 {
+		limitArg, err := strconv.Atoi(cmd.args[0])
+		if err != nil {
+			return err
+		}
+		limit = int32(limitArg)
+	}
+
+	posts, err := s.db.GetPostsForUser(
+		context.Background(),
+		database.GetPostsForUserParams{
+			UserID: user.ID,
+			Limit:  limit,
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Found %d posts\n\n", len(posts))
+
+	for _, post := range posts {
+		fmt.Printf(
+			"Title: %s\nURL: %s\nDescription: %s\nPublished At: %s\n\n",
+			post.Title, post.Url, post.Description, post.PublishedAt.Local().String(),
+		)
+	}
+
+	return nil
+}
+
 func middlewareLoggedIn(
 	handler func(s *state, cmd command, user database.User) error,
 ) func(*state, command) error {
@@ -445,14 +491,36 @@ func scrapeFeeds(s *state, user database.User) error {
 
 	fmt.Printf("Title: %s\n", rssFeed.Channel.Title)
 	fmt.Printf("Link: %s\n", rssFeed.Channel.Link)
-	fmt.Printf("Description: %s\n", rssFeed.Channel.Description)
+	fmt.Printf("Description: %s\n\n", rssFeed.Channel.Description)
 
-	fmt.Println("Items")
 	for _, item := range rssFeed.Channel.Item {
-		fmt.Printf("Item Title: %s\n", item.Title)
-		fmt.Printf("Item Link: %s\n", item.Link)
-		fmt.Printf("Item Description: %s\n", item.Description)
-		fmt.Printf("Item Publish Date: %s\n", item.PubDate)
+		parsedPubDate, err := anytime.Parse(item.PubDate)
+		if err != nil {
+			fmt.Println("date parsing did not work", err)
+			continue
+		}
+
+		err = s.db.CreatePost(
+			context.Background(),
+			database.CreatePostParams{
+				ID:          uuid.New(),
+				Title:       item.Title,
+				Url:         item.Link,
+				Description: item.Description,
+				PublishedAt: parsedPubDate,
+				FeedID:      feed.ID,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+		)
+		if err != nil {
+			if pgerr, ok := err.(*pq.Error); ok {
+				if pgerr.Code != UniqueViolationError {
+					fmt.Println("failed to add a post", err)
+				}
+			}
+			continue
+		}
 	}
 
 	return nil

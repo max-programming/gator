@@ -2,3 +2,5 @@ github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
 github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
+github.com/timematic/anytime v0.0.0-20250424004116-93a49dc8f85f h1:guEgEmhIN9gFlHAWSdgxHNr4UsUtzVT/erIrRKvYyAk=
+github.com/timematic/anytime v0.0.0-20250424004116-93a49dc8f85f/go.mod h1:ZT8Hnv/x/aMp3ewdxT4hYsla7GTwNzQ7Vg6m1XflYYY=
